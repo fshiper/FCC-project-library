@@ -1,53 +1,94 @@
 /*
-*
-*
-*       Complete the API routing below
-*       
-*       
-*/
+ *
+ *
+ *       Complete the API routing below
+ *
+ *
+ */
 
-'use strict';
+"use strict";
 
-var expect = require('chai').expect;
-var MongoClient = require('mongodb').MongoClient;
-var ObjectId = require('mongodb').ObjectId;
-const MONGODB_CONNECTION_STRING = process.env.DB;
+var expect = require("chai").expect;
+const mongoose = require("mongoose");
+const Book = require("../models/book");
 //Example connection: MongoClient.connect(MONGODB_CONNECTION_STRING, function(err, db) {});
 
-module.exports = function (app) {
+module.exports = function(app) {
+  app
+    .route("/api/books")
+    .get(function(req, res) {
+      Book.aggregate(
+        [
+          {
+            $project: {
+              title: 1,
+              commentcount: {
+                $cond: {
+                  if: { $isArray: "$comments" },
+                  then: { $size: "$comments" },
+                  else: "NA"
+                }
+              }
+            }
+          }
+        ],
+        (err, books) => {
+          if (err) return res.status(400).json(err);
+          res.status(200).json(books);
+        }
+      );
+    })
 
-  app.route('/api/books')
-    .get(function (req, res){
-      //response will be array of book objects
-      //json res format: [{"_id": bookid, "title": book_title, "commentcount": num_of_comments },...]
+    .post(function(req, res) {
+      let title = req.body.title;
+      if (!title) return res.send("missing title");
+      let newBook = new Book({ title: title });
+      newBook.save((err, book) => {
+        if (err) return res.status(400).send(`Error saving ${title}`);
+        res.status(200).json(book);
+      });
     })
-    
-    .post(function (req, res){
-      var title = req.body.title;
-      //response will contain new book object including atleast _id and title
-    })
-    
-    .delete(function(req, res){
+
+    .delete(function(req, res) {
+      Book.deleteMany((err, data) => {
+        if (err) res.status(400).json(err)
+        res.status(200).send('complete delete successful')
+      })
       //if successful response will be 'complete delete successful'
     });
 
-
-
-  app.route('/api/books/:id')
-    .get(function (req, res){
-      var bookid = req.params.id;
-      //json res format: {"_id": bookid, "title": book_title, "comments": [comment,comment,...]}
+  app
+    .route("/api/books/:id")
+    .get(function(req, res) {
+      let bookid = req.params.id;
+      Book.findById(bookid, (err, book) => {
+        if (err) return res.status(400).json(err)
+        if (!book) {
+          res.status(200).send('no book exists')  
+        } else {
+          res.status(200).json(book)
+        }
+      })
     })
-    
-    .post(function(req, res){
-      var bookid = req.params.id;
-      var comment = req.body.comment;
-      //json res format same as .get
+
+    .post(function(req, res) {
+      let bookid = req.params.id;
+      let comment = req.body.comment;
+      Book.findById(bookid, (err, book) => {
+        if (err) return res.status(400).json(err)
+        book.comments.push(comment)
+        book.save((err, savedBook) => {
+          if (err) return res.status(400).json(err)
+          res.status(200).json(savedBook)
+        })
+      })
     })
-    
-    .delete(function(req, res){
-      var bookid = req.params.id;
-      //if successful response will be 'delete successful'
+
+    .delete(function(req, res) {
+      let bookid = req.params.id;
+      Book.findByIdAndDelete(bookid, (err, data) => {
+        if (err) return res.status(400).json(err)
+        res.status(200).send('delete successful')
+      })
     });
-  
 };
