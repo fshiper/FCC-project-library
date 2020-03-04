@@ -3,12 +3,15 @@
 var express     = require('express');
 var bodyParser  = require('body-parser');
 var cors        = require('cors');
+const helmet = require('helmet')
 
 var apiRoutes         = require('./routes/api.js');
 var fccTestingRoutes  = require('./routes/fcctesting.js');
 var runner            = require('./test-runner');
 
 var app = express();
+app.use(helmet.noCache())
+app.use(helmet.hidePoweredBy({ setTo: 'PHP 4.2.0' }))
 
 app.use('/public', express.static(process.cwd() + '/public'));
 
@@ -36,6 +39,16 @@ app.use(function(req, res, next) {
     .send('Not Found');
 });
 
+const mongoose = require("mongoose");
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
+//connect to DB
+const db = mongoose.connection;
+db.on("error", console.error.bind(console, "connection error:"));
+db.once("open", function() {
+  console.log("Connected to MongoDB");
 //Start our server and tests!
 app.listen(process.env.PORT || 3000, function () {
   console.log("Listening on port " + process.env.PORT);
@@ -51,6 +64,7 @@ app.listen(process.env.PORT || 3000, function () {
       }
     }, 1500);
   }
+});
 });
 
 module.exports = app; //for unit/functional testing
